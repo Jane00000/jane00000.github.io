@@ -3,9 +3,135 @@
 <head>
   <meta charset="UTF-8">
   <title>Jane Web3 Test</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.15.0/ethers.umd.min.js"></script>
 </head>
+
 <body>
-  <h1>Hello, this is Jane00000's Web3 page.</h1>
-  <p>如果你看得到這段文字，代表網頁建立成功。</p>
+  <h1>Jane00000 Web3 智能合約互動頁面</h1>
+
+  <button id="connectBtn">連接 MetaMask</button>
+
+  <h2>目前合約訊息</h2>
+  <p id="messageOutput">尚未讀取</p>
+
+  <h2>更新合約訊息</h2>
+  <input type="text" id="newMessageInput" placeholder="輸入新的訊息">
+  <button id="updateBtn" disabled>更新訊息</button>
+
+  <h2>執行狀態</h2>
+  <pre id="output">等待操作...</pre>
+
+  <script>
+    const CONTRACT_ADDRESS = "0x31CD3379A69dD45D253F42d0A54c65D87e6490FA";
+
+    const CONTRACT_ABI = [
+      {
+        "inputs": [],
+        "name": "message",
+        "outputs": [
+          {
+            "internalType": "string",
+            "name": "",
+            "type": "string"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      },
+      {
+        "inputs": [
+          {
+            "internalType": "string",
+            "name": "_newMessage",
+            "type": "string"
+          }
+        ],
+        "name": "updateMessage",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      }
+    ];
+
+    const connectBtn = document.getElementById("connectBtn");
+    const updateBtn = document.getElementById("updateBtn");
+    const messageOutput = document.getElementById("messageOutput");
+    const newMessageInput = document.getElementById("newMessageInput");
+    const output = document.getElementById("output");
+
+    let provider;
+    let signer;
+    let contract;
+
+    function log(text) {
+      output.textContent += "\n" + text;
+    }
+
+    async function connectWallet() {
+      try {
+        if (!window.ethereum) {
+          log("找不到 MetaMask，請先安裝或登入 MetaMask。");
+          return;
+        }
+
+        await window.ethereum.request({ method: "eth_requestAccounts" });
+
+        provider = new ethers.BrowserProvider(window.ethereum);
+        signer = await provider.getSigner();
+
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+        const walletAddress = await signer.getAddress();
+        log("已連接錢包：" + walletAddress);
+
+        connectBtn.disabled = true;
+        connectBtn.textContent = "已連接 MetaMask";
+        updateBtn.disabled = false;
+
+        await readMessage();
+
+      } catch (error) {
+        log("連接失敗：" + error.message);
+      }
+    }
+
+    async function readMessage() {
+      try {
+        const currentMessage = await contract.message();
+        messageOutput.textContent = currentMessage;
+        log("成功讀取合約訊息：" + currentMessage);
+      } catch (error) {
+        log("讀取失敗：" + error.message);
+      }
+    }
+
+    async function updateMessage() {
+      try {
+        const newMessage = newMessageInput.value;
+
+        if (newMessage.trim() === "") {
+          log("請先輸入新的訊息。");
+          return;
+        }
+
+        log("正在送出交易，請到 MetaMask 確認...");
+        const tx = await contract.updateMessage(newMessage);
+
+        log("交易已送出，交易 Hash：" + tx.hash);
+        log("等待交易確認中...");
+
+        await tx.wait();
+
+        log("交易完成，合約訊息已更新。");
+        await readMessage();
+
+      } catch (error) {
+        log("更新失敗：" + error.message);
+      }
+    }
+
+    connectBtn.addEventListener("click", connectWallet);
+    updateBtn.addEventListener("click", updateMessage);
+  </script>
 </body>
 </html>
